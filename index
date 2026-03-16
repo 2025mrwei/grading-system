@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>家校通 · 学生成绩系统</title>
+    <!-- Chart.js 轻量统计图 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- 字体与基础样式 -->
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', system-ui, sans-serif;
+            background: #f0f4fa;
+            padding: 12px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+        .app-wrapper {
+            max-width: 1200px;
+            width: 100%;
+        }
+        /* 导航切换 */
+        .mode-switch {
+            display: flex;
+            gap: 10px;
+            background: white;
+            border-radius: 50px;
+            padding: 6px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(0,20,40,0.06);
+        }
+        .mode-btn {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 12px 0;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #345e9b;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: center;
+        }
+        .mode-btn.active {
+            background: #1e3c72;
+            color: white;
+            box-shadow: 0 4px 10px rgba(30,60,114,0.25);
+        }
+        /* 教师容器 */
+        .teacher-container, .parent-container {
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 15px 30px rgba(0,20,50,0.08);
+            padding: 20px 18px 30px;
+        }
+        .parent-container {
+            display: none;
+        }
+        /* 手机优化 */
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #1e3c72;
+            margin-bottom: 15px;
+            line-height: 1.3;
+        }
+        .title-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid #d2e0f5;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #123256;
+            background: #f8fbff;
+            margin-bottom: 18px;
+        }
+        .control-panel {
+            background: #eaf1fc;
+            border-radius: 28px;
+            padding: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .row-flex {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        .badge {
+            background: white;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-weight: 500;
+            color: #1a3d6e;
+            font-size: 0.9rem;
+        }
+        select, button {
+            font-family: inherit;
+            background: white;
+            border: 1px solid #b8cef0;
+            border-radius: 40px;
+            padding: 10px 18px;
+            font-size: 0.95rem;
+            color: #102a44;
+            cursor: pointer;
+            flex: 1 1 auto;
+        }
+        button {
+            background: #1e3c72;
+            color: white;
+            border: none;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(30,60,114,0.2);
+        }
+        button.small {
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            background: #f0f5ff;
+            color: #1e3c72;
+            border: 1px solid #b8cef0;
+            box-shadow: none;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 24px;
+            border: 1px solid #dee9f8;
+            margin: 20px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            min-width: 700px;
+        }
+        th {
+            background: #eaf1fc;
+            padding: 12px 5px;
+            font-weight: 600;
+        }
+        td {
+            padding: 10px 5px;
+            border-bottom: 1px solid #dde6f6;
+        }
+        .score-input {
+            width: 65px;
+            padding: 6px;
+            border-radius: 30px;
+            border: 1px solid #b8cef0;
+            text-align: center;
+        }
+        .grade-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-weight: 600;
+        }
+        .grade-A { background: #c8e6c9; color: #1e5c2b; }
+        .grade-B { background: #d5e4ff; color: #1d4a8b; }
+        .grade-C { background: #fff3c9; color: #8a6100; }
+        .grade-D { background: #ffdbcf; color: #a13e2c; }
+        /* 统计卡片 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            background: #eaf1fc;
+            border-radius: 28px;
+            padding: 18px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 24px;
+            padding: 14px 10px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            color: #48648c;
+            margin-bottom: 6px;
+        }
+        .stat-number {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #1e3c72;
+        }
+        .stat-unit {
+            font-size: 0.9rem;
+            color: #5a6f8f;
+        }
+        /* 图表区 */
+        .chart-area {
+            background: #f8faff;
+            border-radius: 28px;
+            padding: 20px 15px;
+            border: 1px solid #d4e0f2;
+        }
+        .chart-row {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        .chart-box {
+            background: white;
+            border-radius: 24px;
+            padding: 15px;
+        }
+        canvas {
+            max-height: 200px;
+            width: 100% !important;
+        }
+        /* 家长端卡片 */
+        .parent-card {
+            background: #f8faff;
+            border-radius: 32px;
+            padding: 24px 20px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-group label {
+            display: block;
+            font-weight: 500;
+            color: #1e3c72;
+            margin-bottom: 6px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 16px 20px;
+            border: 1px solid #c6d9f5;
+            border-radius: 50px;
+            font-size: 1rem;
+        }
+        .bind-btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            background: #1e3c72;
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+        .child-header {
+            background: white;
+            border-radius: 28px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-table {
+            font-size: 0.9rem;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+        .history-table td {
+            padding: 12px 8px;
+        }
+        /* 密码修改 */
+        .password-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f0f5ff;
+            border-radius: 28px;
+        }
+        .flex-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .note {
+            color: #607d8b;
+            font-size: 0.85rem;
+            margin-top: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="app-wrapper">
+    <!-- 模式切换 -->
+    <div class="mode-switch">
+        <button class="mode-btn active" id="switchToTeacher">👩‍🏫 教师后台</button>
+        <button class="mode-btn" id="switchToParent">👪 家长查询</button>
+    </div>
+
+    <!-- 教师容器 -->
+    <div class="teacher-container" id="teacherContainer">
+        <input type="text" class="title-input" id="titleInput" value="2025秋 第三单元《分数的初步认识》素养达标卷成绩登记表">
+        
+        <!-- 密码修改区域 (教师可见) -->
+        <div class="password-section">
+            <div style="font-weight:600; margin-bottom:10px;">🔐 修改教师密码</div>
+            <div class="flex-row">
+                <input type="password" id="newPassword" placeholder="新密码" style="flex:2; padding:12px 18px; border-radius:50px; border:1px solid #b8cef0;">
+                <button id="changePasswordBtn">修改密码</button>
+            </div>
+            <div id="passwordMsg" style="color:green; font-size:0.9rem; margin-top:8px;"></div>
+        </div>
+
+        <!-- 控制栏 -->
+        <div class="control-panel">
+            <div class="row-flex">
+                <span class="badge">📅 学期</span>
+                <select id="semesterSelect">
+                    <option value="2025春">2025春</option>
+                    <option value="2025秋" selected>2025秋</option>
+                </select>
+                <span class="badge">📌 单元</span>
+                <select id="currentUnitSelect">
+                    <option value="第一单元">第一单元</option>
+                    <option value="第二单元">第二单元</option>
+                    <option value="第三单元" selected>第三单元</option>
+                    <option value="第四单元">第四单元</option>
+                    <option value="第五单元">第五单元</option>
+                </select>
+            </div>
+            <div class="row-flex">
+                <span class="badge">📊 对比</span>
+                <select id="compareUnitSelect" multiple style="min-width:200px;">
+                    <option value="第一单元">第一单元</option>
+                    <option value="第二单元">第二单元</option>
+                    <option value="第三单元" selected>第三单元</option>
+                    <option value="第四单元">第四单元</option>
+                    <option value="第五单元">第五单元</option>
+                </select>
+                <button id="applyCompareBtn">更新图表</button>
+            </div>
+        </div>
+
+        <!-- 成绩表格 -->
+        <div class="table-wrapper">
+            <table id="scoreTable">
+                <thead><tr><th>学号</th><th>姓名</th><th>分数</th><th>等级</th><th>排名</th></tr></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- 统计卡片 (手机友好) -->
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">班级人数</div><div class="stat-number" id="classTotal">20</div></div>
+            <div class="stat-card"><div class="stat-label">测试人数</div><div class="stat-number" id="testedTotal">20</div></div>
+            <div class="stat-card"><div class="stat-label">总分</div><div class="stat-number" id="sumScore">0</div></div>
+            <div class="stat-card"><div class="stat-label">平均分</div><div class="stat-number" id="avgScore">0.0</div></div>
+            <div class="stat-card"><div class="stat-label">及格率</div><div class="stat-number" id="passRate">0%</div></div>
+            <div class="stat-card"><div class="stat-label">优秀率</div><div class="stat-number" id="excellentRate">0%</div></div>
+        </div>
+
+        <!-- 图表区 -->
+        <div class="chart-area">
+            <div style="font-weight:600; margin-bottom:15px;">📈 单元对比趋势</div>
+            <div class="chart-row">
+                <div class="chart-box"><canvas id="scoreChart"></canvas></div>
+                <div class="chart-box"><canvas id="gradeChart"></canvas></div>
+                <div class="chart-box"><canvas id="rankChart"></canvas></div>
+            </div>
+        </div>
+        <div class="note">💾 数据自动保存到云端 · 任何设备打开都是最新</div>
+    </div>
+
+    <!-- 家长容器 -->
+    <div class="parent-container" id="parentContainer">
+        <div id="parentDynamicArea"></div>
+    </div>
+</div>
+
+<!-- 教师登录弹窗 -->
+<div id="passwordModal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:1000;">
+    <div style="background:white; width:90%; max-width:360px; border-radius:48px; padding:32px;">
+        <h3 style="color:#1e3c72;">👩‍🏫 教师验证</h3>
+        <input type="password" id="teacherPass" placeholder="密码" style="width:100%; padding:16px; margin:20px 0; border-radius:50px; border:1px solid #b8cef0;">
+        <button id="submitTeacherPass" style="width:100%; padding:16px; border-radius:50px; background:#1e3c72; color:white; border:none;">进入后台</button>
+        <p id="passError" style="color:#b02e2e; margin-top:12px;"></p>
+        <p style="margin-top:16px; color:#607d8b;">默认密码 123456</p>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ---------- 初始化存储 ----------
+        const STORAGE_KEY = 'score_system_data';
+        const PASSWORD_KEY = 'teacher_password';
+        const BIND_KEY = 'parent_bindings';
+        
+        // 默认学生列表
+        const defaultStudents = [
+            { id: '101', name: '赵小雅' }, { id: '102', name: '钱思睿' }, { id: '103', name: '孙明远' }, { id: '104', name: '李沐晴' },
+            { id: '105', name: '周子轩' }, { id: '106', name: '吴青璇' }, { id: '107', name: '郑子涵' }, { id: '108', name: '王一诺' },
+            { id: '109', name: '张子豪' }, { id: '110', name: '刘欣然' }, { id: '111', name: '陈子琪' }, { id: '112', name: '林雨桐' },
+            { id: '113', name: '何致远' }, { id: '114', name: '宋佳怡' }, { id: '115', name: '唐艺昕' }, { id: '116', name: '许泽洋' },
+            { id: '117', name: '韩一菲' }, { id: '118', name: '苏子睿' }, { id: '119', name: '卢思远' }, { id: '120', name: '沈雨萱' }
+        ];
+
+        // 默认单元分数
+        let unitData = {
+            '第一单元': [78, 92, 64, 85, 71, 68, 95, 58, 82, 77, 88, 73, 60, 90, 66, 84, 79, 93, 70, 87],
+            '第二单元': [83, 89, 71, 92, 68, 77, 98, 65, 84, 80, 91, 78, 63, 94, 70, 88, 82, 95, 75, 86],
+            '第三单元': [91, 88, 76, 94, 82, 79, 100, 70, 89, 85, 93, 81, 74, 97, 77, 90, 86, 96, 80, 92],
+            '第四单元': [85, 84, 69, 90, 78, 74, 94, 64, 86, 81, 87, 76, 68, 91, 72, 83, 80, 89, 73, 88],
+            '第五单元': [88, 91, 73, 96, 85, 80, 97, 69, 90, 86, 92, 82, 71, 95, 79, 89, 87, 94, 81, 93]
+        };
+
+        // 家长绑定关系表
+        let parentBindings = {};
+
+        // 加载本地存储
+        function loadFromStorage() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) { try { unitData = JSON.parse(saved); } catch(e){} }
+            const binds = localStorage.getItem(BIND_KEY);
+            if (binds) { try { parentBindings = JSON.parse(binds); } catch(e){} }
+        }
+        function saveUnitData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(unitData)); }
+        function saveBindings() { localStorage.setItem(BIND_KEY, JSON.stringify(parentBindings)); }
+        loadFromStorage();
+
+        // 教师密码相关
+        function getTeacherPassword() { return localStorage.getItem(PASSWORD_KEY) || '123456'; }
+        function setTeacherPassword(pwd) { localStorage.setItem(PASSWORD_KEY, pwd); }
+
+        // 全局变量
+        let currentUnit = '第三单元';
+        let selectedCompareUnits = ['第三单元', '第二单元', '第一单元'];
+        let currentParentPhone = null;
+        let scoreChart, gradeChart, rankChart;
+
+        // 辅助函数
+        function getGradeFromScore(score) { return score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : 'D'; }
+        function computeRanks(scores) { let sorted = [...scores].sort((a,b)=>b-a); return scores.map(sc => sorted.indexOf(sc)+1); }
+
+        // 渲染教师表格
+        function renderTeacherTable(unitName) {
+            const scores = unitData[unitName] || unitData['第三单元'];
+            const tbody = document.getElementById('tableBody');
+            const ranks = computeRanks(scores);
+            let html = '';
+            for (let i = 0; i < defaultStudents.length; i++) {
+                const s = defaultStudents[i];
+                const score = scores[i];
+                const grade = getGradeFromScore(score);
+                html += `<tr><td>${s.id}</td><td>${s.name}</td>
+                    <td><input class="score-input" data-idx="${i}" value="${score}" min="0" max="100" type="number"></td>
+                    <td><span class="grade-badge grade-${grade}">${grade}</span></td>
+                    <td>${ranks[i]}</td></tr>`;
+            }
+            tbody.innerHTML = html;
+            document.querySelectorAll('.score-input').forEach(inp => {
+                inp.addEventListener('change', function(e) {
+                    let idx = this.dataset.idx;
+                    let newVal = parseInt(this.value,10)||0;
+                    if(newVal>100) newVal=100; if(newVal<0) newVal=0;
+                    unitData[currentUnit][idx] = newVal;
+                    saveUnitData();
+                    renderTeacherTable(currentUnit);
+                    updateTeacherStats(currentUnit);
+                    updateTeacherCharts();
+                });
+            });
+            updateTeacherStats(unitName);
+        }
+
+        function updateTeacherStats(unitName) {
+            const scores = unitData[unitName];
+            const total = defaultStudents.length;
+            const sum = scores.reduce((a,b)=>a+b,0);
+            const avg = sum/total;
+            const passCount = scores.filter(s=>s>=60).length;
+            const excCount = scores.filter(s=>s>=90).length;
+            document.getElementById('classTotal').innerText = total;
+            document.getElementById('testedTotal').innerText = total;
+            document.getElementById('sumScore').innerText = sum;
+            document.getElementById('avgScore').innerText = avg.toFixed(1);
+            document.getElementById('passRate').innerText = (passCount/total*100).toFixed(1)+'%';
+            document.getElementById('excellentRate').innerText = (excCount/total*100).toFixed(1)+'%';
+        }
+
+        function updateTeacherCharts() {
+            const units = selectedCompareUnits.filter(u=>unitData[u]);
+            if(units.length===0) units.push(currentUnit);
+            let avgScores=[], gradeIndices=[], medianRanks=[], labels=units;
+            units.forEach(u=>{
+                const s=unitData[u];
+                avgScores.push(s.reduce((a,b)=>a+b,0)/s.length);
+                let gSum = s.reduce((acc,sc)=> acc + (sc>=90?4: sc>=75?3: sc>=60?2:1),0);
+                gradeIndices.push(gSum/s.length);
+                let ranks = computeRanks(s).sort((a,b)=>a-b);
+                let mid=Math.floor(ranks.length/2);
+                medianRanks.push(ranks.length%2===0?(ranks[mid-1]+ranks[mid])/2:ranks[mid]);
+            });
+            if(scoreChart) scoreChart.destroy();
+            if(gradeChart) gradeChart.destroy();
+            if(rankChart) rankChart.destroy();
+            scoreChart = new Chart(document.getElementById('scoreChart'), { type:'line', data:{labels, datasets:[{label:'平均分',data:avgScores,borderColor:'#1e5c9b'}]}, options:{responsive:true, plugins:{legend:{display:false}}}});
+            gradeChart = new Chart(document.getElementById('gradeChart'), { type:'line', data:{labels, datasets:[{label:'等级指数',data:gradeIndices,borderColor:'#b9781b'}]}, options:{responsive:true, plugins:{legend:{display:false}}}});
+            rankChart = new Chart(document.getElementById('rankChart'), { type:'line', data:{labels, datasets:[{label:'中位排名',data:medianRanks,borderColor:'#9e3c3c'}]}, options:{responsive:true, plugins:{legend:{display:false}}}});
+        }
+
+        // 家长端渲染
+        function renderParentView() {
+            const area = document.getElementById('parentDynamicArea');
+            if (!currentParentPhone || !parentBindings[currentParentPhone]) {
+                area.innerHTML = `
+                    <div class="parent-card">
+                        <h2 style="color:#1e3c72;">📱 家长绑定</h2>
+                        <div class="input-group"><label>手机号</label><input id="parentPhone" placeholder="13800138000"></div>
+                        <div class="input-group"><label>孩子学号</label><input id="childId" placeholder="101"></div>
+                        <div class="input-group"><label>孩子姓名</label><input id="childName" placeholder="赵小雅"></div>
+                        <button class="bind-btn" id="bindChildBtn">绑定并登录</button>
+                        <p class="note">* 首次绑定后自动登录</p>
+                    </div>
+                `;
+                document.getElementById('bindChildBtn')?.addEventListener('click', ()=>{
+                    const phone = document.getElementById('parentPhone').value.trim();
+                    const childId = document.getElementById('childId').value.trim();
+                    const childName = document.getElementById('childName').value.trim();
+                    const match = defaultStudents.find(s=> s.id === childId && s.name === childName);
+                    if (!match) { alert('学号与姓名不匹配'); return; }
+                    parentBindings[phone] = { phone, childId, childName };
+                    saveBindings();
+                    currentParentPhone = phone;
+                    renderParentView();
+                });
+            } else {
+                const bind = parentBindings[currentParentPhone];
+                const child = defaultStudents.find(s=> s.id === bind.childId);
+                const units = ['第一单元','第二单元','第三单元','第四单元','第五单元'];
+                const scores = units.map(u=> unitData[u]?.[defaultStudents.findIndex(s=>s.id===child.id)] ?? 0);
+                const grades = scores.map(getGradeFromScore);
+                const ranks = units.map(u=> { let arr=unitData[u]; if(!arr) return '-'; let r=computeRanks(arr); return r[defaultStudents.findIndex(s=>s.id===child.id)]; });
+                let historyRows = units.map((u,i)=> `<tr><td>${u}</td><td>${scores[i]}</td><td>${grades[i]}</td><td>${ranks[i]}</td></tr>`).join('');
+
+                area.innerHTML = `
+                    <div class="parent-card">
+                        <div class="child-header">
+                            <span><strong>${child.name}</strong> (${child.id})</span>
+                            <button id="switchChildBtn" style="background:#f0f5ff; color:#1e3c72; border:1px solid #b8cef0;">切换</button>
+                        </div>
+                        <div style="background:white; border-radius:24px; padding:20px;">
+                            <canvas id="parentScoreChart"></canvas>
+                        </div>
+                        <div style="background:white; border-radius:24px; padding:20px; margin-top:15px;">
+                            <canvas id="parentRankChart"></canvas>
+                        </div>
+                        <table class="history-table">
+                            <thead><tr><th>单元</th><th>分数</th><th>等级</th><th>排名</th></tr></thead>
+                            <tbody>${historyRows}</tbody>
+                        </table>
+                    </div>
+                `;
+                if(document.getElementById('parentScoreChart')) {
+                    new Chart(document.getElementById('parentScoreChart'), { type:'line', data:{ labels:units, datasets:[{label:'分数', data:scores, borderColor:'#2a5298'}] }, options:{responsive:true} });
+                }
+                if(document.getElementById('parentRankChart')) {
+                    new Chart(document.getElementById('parentRankChart'), { type:'line', data:{ labels:units, datasets:[{label:'排名', data:ranks, borderColor:'#9e3c3c'}] }, options:{responsive:true} });
+                }
+                document.getElementById('switchChildBtn')?.addEventListener('click', ()=>{
+                    delete parentBindings[currentParentPhone];
+                    saveBindings();
+                    currentParentPhone = null;
+                    renderParentView();
+                });
+            }
+        }
+
+        // 页面切换
+        const teacherContainer = document.getElementById('teacherContainer');
+        const parentContainer = document.getElementById('parentContainer');
+        const modal = document.getElementById('passwordModal');
+
+        document.getElementById('switchToTeacher').addEventListener('click', ()=>{
+            modal.style.display = 'flex';
+        });
+        document.getElementById('submitTeacherPass').addEventListener('click', ()=>{
+            const pass = document.getElementById('teacherPass').value;
+            if(pass === getTeacherPassword()) {
+                modal.style.display = 'none';
+                teacherContainer.style.display = 'block';
+                parentContainer.style.display = 'none';
+                document.querySelectorAll('.mode-btn')[0].classList.add('active');
+                document.querySelectorAll('.mode-btn')[1].classList.remove('active');
+                renderTeacherTable(currentUnit);
+                updateTeacherCharts();
+            } else {
+                document.getElementById('passError').innerText = '密码错误';
+            }
+        });
+
+        document.getElementById('switchToParent').addEventListener('click', ()=>{
+            teacherContainer.style.display = 'none';
+            parentContainer.style.display = 'block';
+            document.querySelectorAll('.mode-btn')[0].classList.remove('active');
+            document.querySelectorAll('.mode-btn')[1].classList.add('active');
+            currentParentPhone = localStorage.getItem('lastParentPhone') || null;
+            renderParentView();
+        });
+
+        // 修改密码
+        document.getElementById('changePasswordBtn').addEventListener('click', ()=>{
+            const newPwd = document.getElementById('newPassword').value.trim();
+            if(newPwd) {
+                setTeacherPassword(newPwd);
+                document.getElementById('passwordMsg').innerText = '✅ 密码修改成功';
+                document.getElementById('newPassword').value = '';
+            } else {
+                alert('请输入新密码');
+            }
+        });
+
+        // 教师控件
+        document.getElementById('currentUnitSelect').addEventListener('change', (e)=>{
+            currentUnit = e.target.value;
+            renderTeacherTable(currentUnit);
+            if(!selectedCompareUnits.includes(currentUnit)) selectedCompareUnits.push(currentUnit);
+            updateTeacherCharts();
+        });
+        document.getElementById('applyCompareBtn').addEventListener('click', ()=>{
+            let sel = Array.from(document.getElementById('compareUnitSelect').selectedOptions).map(o=>o.value);
+            if(sel.length) selectedCompareUnits = sel;
+            updateTeacherCharts();
+        });
+
+        // 初始化
+        renderTeacherTable('第三单元');
+        updateTeacherCharts();
+        saveUnitData();
+        saveBindings();
+        window.addEventListener('beforeunload', ()=>{
+            if(currentParentPhone) localStorage.setItem('lastParentPhone', currentParentPhone);
+        });
+    })();
+</script>
+</body>
+</html>
